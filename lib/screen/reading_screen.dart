@@ -1,7 +1,8 @@
 import 'dart:math';
 
-import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/material.dart';
+import 'package:kids_learning/service/audio_service.dart';
 
 class LearningScreen extends StatefulWidget {
   const LearningScreen({super.key});
@@ -11,7 +12,6 @@ class LearningScreen extends StatefulWidget {
 }
 
 class _LearningScreenState extends State<LearningScreen> with SingleTickerProviderStateMixin {
-  final AudioPlayer _audioPlayer = AudioPlayer();
   String currentLetter = 'A';
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -67,6 +67,7 @@ class _LearningScreenState extends State<LearningScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
+    AudioService.createPlayer('learning_screen');
     _controller = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -78,7 +79,8 @@ class _LearningScreenState extends State<LearningScreen> with SingleTickerProvid
 
   void _playSound(String word) async {
     try {
-      await _audioPlayer.play(AssetSource('sounds/${word.toLowerCase().replaceAll(" ", "")}.mp3'));
+      await AudioService.playAudio(
+          "learning_screen", "sounds/${word.toLowerCase().replaceAll(" ", "")}.mp3", 0.8, ReleaseMode.release);
       _controller.forward().then((_) => _controller.reverse());
     } catch (e) {
       debugPrint('Error playing sound: $e');
@@ -87,7 +89,7 @@ class _LearningScreenState extends State<LearningScreen> with SingleTickerProvid
 
   @override
   void dispose() {
-    _audioPlayer.dispose();
+    AudioService.disposeAudio("learning_screen");
     _controller.dispose();
     super.dispose();
   }
