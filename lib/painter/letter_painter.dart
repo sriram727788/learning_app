@@ -139,7 +139,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:kids_learning/widgets/path_segment.dart';
 
-class LetterPainter extends CustomPainter {
+/* class LetterPainter extends CustomPainter {
   final List<PathSegment> pathSegments;
   final int currentSegmentIndex;
   final double clearProgress;
@@ -319,8 +319,205 @@ class _AnimatedLetterPainterState extends State<AnimatedLetterPainter> with Sing
       size: Size.infinite,
     );
   }
+} */
+
+class LetterPainter extends CustomPainter {
+  final List<PathSegment> pathSegments;
+  final int currentSegmentIndex;
+  final double clearProgress;
+  final ui.Picture? pointerSvg;
+  final double animationValue;
+  final double scale;
+  final Offset offset;
+
+  LetterPainter({
+    required this.pathSegments,
+    required this.currentSegmentIndex,
+    required this.clearProgress,
+    required this.animationValue,
+    required this.scale,
+    required this.offset,
+    this.pointerSvg,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Apply scaling and centering transformation
+    canvas.save();
+    canvas.translate(offset.dx, offset.dy);
+    canvas.scale(scale);
+
+    for (int i = 0; i < pathSegments.length; i++) {
+      final segment = pathSegments[i];
+      final bool isActive = i == currentSegmentIndex;
+
+      // Draw background guide path
+      if (!segment.isCompleted) {
+        final Paint guidePaint = Paint()
+          ..color = isActive ? Colors.blue.withOpacity(0.2) : Colors.grey.withOpacity(0.3)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 60 // This will be scaled automatically
+          ..strokeCap = StrokeCap.round;
+
+        canvas.drawPath(segment.path, guidePaint);
+
+        // Enhanced dotted line visibility
+        final Paint dottedPaint = Paint()
+          ..color = Colors.blue.withOpacity(isActive ? 0.6 : 0.3)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5;
+
+        final Path dashPath = Path.from(segment.path);
+        canvas.drawPath(dashPath, dottedPaint);
+
+        if (isActive) {
+          final startPoint = segment.points.first;
+          final Paint startPointPaint = Paint()
+            ..color = Colors.blue
+            ..style = PaintingStyle.fill;
+
+          canvas.drawCircle(startPoint, 30, startPointPaint); // Inner fill
+        }
+      }
+
+      // Draw completed segments with enhanced visibility
+      if (segment.isCompleted) {
+        final Paint completedPaint = Paint()
+          ..color = Colors.green
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 60
+          ..strokeCap = StrokeCap.round;
+
+        canvas.drawPath(segment.path, completedPaint);
+      } else if (isActive && segment.currentTrace.isNotEmpty) {
+        final Paint progressPaint = Paint()
+          ..color = Colors.blue.withOpacity(segment.isClearing ? 1 - segment.clearProgress : 1)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 60
+          ..strokeCap = StrokeCap.round;
+
+        final ui.PathMetrics metrics = segment.path.computeMetrics();
+        for (final metric in metrics) {
+          final Path extractPath = metric.extractPath(
+            0,
+            metric.length * segment.progress,
+          );
+          canvas.drawPath(extractPath, progressPaint);
+        }
+      }
+
+      // Draw animated pointer SVG for active segment
+      if (isActive && !segment.isCompleted && pointerSvg != null) {
+        final ui.PathMetrics metrics = segment.path.computeMetrics();
+        for (final metric in metrics) {
+          final double distance = metric.length * animationValue;
+          final ui.Tangent? tangent = metric.getTangentForOffset(distance);
+
+          if (tangent != null) {
+            final double angle = atan2(tangent.vector.dy, tangent.vector.dx);
+            const double strokeOffset = -35.0;
+
+            final Offset pointerPosition = Offset(
+              tangent.position.dx + strokeOffset * cos(angle - pi / 2),
+              tangent.position.dy + strokeOffset * sin(angle - pi / 2),
+            );
+
+            canvas.save();
+            canvas.translate(pointerPosition.dx, pointerPosition.dy);
+            canvas.rotate(angle - pi / 2);
+            canvas.scale(0.15); // Pointer scale remains constant relative to stroke width
+            canvas.drawPicture(pointerSvg!);
+            canvas.restore();
+          }
+        }
+      }
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(LetterPainter oldDelegate) {
+    return oldDelegate.currentSegmentIndex != currentSegmentIndex ||
+        oldDelegate.clearProgress != clearProgress ||
+        oldDelegate.pointerSvg != pointerSvg ||
+        oldDelegate.animationValue != animationValue ||
+        oldDelegate.scale != scale ||
+        oldDelegate.offset != offset;
+  }
 }
 
+class AnimatedLetterPainter extends StatefulWidget {
+  final List<PathSegment> pathSegments;
+  final int currentSegmentIndex;
+  final double clearProgress;
+  final double scale;
+  final Offset offset;
+
+  const AnimatedLetterPainter({
+    super.key,
+    required this.pathSegments,
+    required this.currentSegmentIndex,
+    required this.clearProgress,
+    required this.scale,
+    required this.offset,
+  });
+
+  @override
+  State<AnimatedLetterPainter> createState() => _AnimatedLetterPainterState();
+}
+
+class _AnimatedLetterPainterState extends State<AnimatedLetterPainter> with SingleTickerProviderStateMixin {
+  late Ticker _ticker;
+  double _animationValue = 0.0;
+  ui.Picture? pointerSvg;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPointerSvg();
+    _ticker = createTicker((elapsed) {
+      setState(() {
+        _animationValue = (elapsed.inMilliseconds / 3000.0) % 1.0;
+      });
+    });
+    _ticker.start();
+  }
+
+  void _loadPointerSvg() async {
+    final picture = await _loadSvgAsset('assets/images/pointer.svg');
+    setState(() {
+      pointerSvg = picture;
+    });
+  }
+
+  Future<ui.Picture> _loadSvgAsset(String assetPath) async {
+    final String rawSvg = await DefaultAssetBundle.of(context).loadString(assetPath);
+    final PictureInfo pictureInfo = await vg.loadPicture(SvgStringLoader(rawSvg), null);
+    return pictureInfo.picture;
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: LetterPainter(
+        pathSegments: widget.pathSegments,
+        currentSegmentIndex: widget.currentSegmentIndex,
+        clearProgress: widget.clearProgress,
+        pointerSvg: pointerSvg,
+        animationValue: _animationValue,
+        scale: widget.scale,
+        offset: widget.offset,
+      ),
+      size: Size(450 * widget.scale, 450 * widget.scale),
+    );
+  }
+}
 
 //================================= Arrow animation ================================================
 
@@ -521,5 +718,56 @@ class _AnimatedLetterPainterState extends State<AnimatedLetterPainter> with Sing
       size: Size.infinite,
     );
   }
+}
+ */
+
+
+/* bool isPointNearPath(Offset point, List<Offset> pathPoints, {bool checkDirection = true}) {
+  if (pathPoints.isEmpty) return false;
+
+  PathSegment currentSegment = pathSegments[currentSegmentIndex];
+  Offset transformedPoint = _transformPoint(point);
+
+  // For initial touch, check if it's near any point (removed start range restriction)
+  if (!isDrawing || !checkDirection) {
+  int startRange = (pathPoints.length * 0.1).round(); // 10% of path length
+      double minStartDistance = double.infinity;
+      int startIndex = -1;
+
+    for (int i = 0; i < pathPoints.length; i++) {
+      double distance = (transformedPoint - pathPoints[i]).distance;
+      if (distance <= 50) {
+        currentSegment.progressIndex = i;
+        lastValidPoint = pathPoints[i];
+        return true;
+      }
+    }
+    return false;
+  }
+
+  int searchStart = currentSegment.progressIndex;
+  double minDistance = double.infinity;
+  int closestIndex = -1;
+
+  // Search all remaining points
+  for (int i = searchStart; i < pathPoints.length; i++) {
+    double distance = (transformedPoint - pathPoints[i]).distance;
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestIndex = i;
+    }
+  }
+
+  if (closestIndex != -1) {
+    // Mark points as visited
+    for (int i = currentSegment.progressIndex; i <= closestIndex; i++) {
+      currentSegment.pointsVisited[i] = true;
+    }
+    currentSegment.progressIndex = closestIndex;
+    lastValidPoint = pathPoints[closestIndex];
+    return true;
+  }
+
+  return true; // Always return true to prevent resetting
 }
  */

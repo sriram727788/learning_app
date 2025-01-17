@@ -88,13 +88,14 @@ class _WritingPadState extends State<WritingPad> with SingleTickerProviderStateM
                 children: [
                   Expanded(
                     child: Center(
-                      child: Container(
-                        alignment: Alignment.center,
-                        width: 400,
-                        height: 400,
-                        child: LetterTracingScreen(
-                          letter: widget.letter,
-                          onLetterCompleted: onLetterComplete, // Pass the callback here
+                      child: SizedBox(
+                        width: 450,
+                        height: 450,
+                        child: Center(
+                          child: LetterTracingScreen(
+                            letter: widget.letter,
+                            onLetterCompleted: onLetterComplete, // Pass the callback here
+                          ),
                         ),
                       ),
                     ),

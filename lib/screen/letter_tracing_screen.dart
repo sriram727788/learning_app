@@ -30,9 +30,9 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
   bool isAnimating = false;
   late ConfettiController _confettiController;
   bool _showNextButton = false;
-
-  static const double threshold = 25;
-  static const double offTrackTolerance = 1.0;
+  double _scale = 20.0;
+  Offset _offset = Offset.zero;
+  static const double threshold = 50;
 
   // Add celebration animation controller
   late AnimationController _celebrationController;
@@ -126,27 +126,21 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
     });
   }
 
-  /* void startClearAnimation() {
-    if (currentSegmentIndex >= pathSegments.length) return;
+  void _calculateScaleAndOffset(Size screenSize) {
+    // Original viewport size is 450x450
+    const originalSize = 450.0;
 
-    PathSegment segment = pathSegments[currentSegmentIndex];
-    if (segment.isClearing) return; // Prevent overlapping animations
+    // Calculate scale based on screen width with some padding
+    _scale = (screenSize.width) / (originalSize - 50);
 
-    setState(() {
-      segment.isClearing = true;
-    });
+    // Calculate center offset
+    _offset = Offset((screenSize.width - (originalSize * _scale)) / 2, 0);
+  }
 
-    // Animate clearing progress
-    setState(() {
-      segment.clearProgress = 1.0; // Trigger clearing animation
-    });
-    setState(() {
-      segment.progress = 0.0;
-      segment.clearProgress = 0.0;
-      segment.isClearing = false;
-      segment.currentTrace.clear();
-    });
-  } */
+  // Modified method to transform points based on scale and offset
+  Offset _transformPoint(Offset point) {
+    return (point - _offset) / _scale;
+  }
 
   void startClearAnimation() {
     if (currentSegmentIndex >= pathSegments.length) return;
@@ -158,26 +152,18 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
       segment.isClearing = true;
       segment.clearProgress = 1.0;
 
-      // Reset all progress tracking
-      segment.reset();
-      lastValidPoint = null;
+      // Schedule the reset after animation
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          setState(() {
+            segment.reset();
+            lastValidPoint = null;
+            // Don't set isDrawing here - let it be controlled by touch events
+          });
+        }
+      });
     });
   }
-
-  /* void initializePathSegments() {
-    setState(() {
-      pathSegments = [];
-      final List<String> paths = getLetterPaths(widget.letter);
-
-      for (String pathData in paths) {
-        final Path path = parseSvgPathData(pathData);
-        final List<Offset> points = extractPointsFromPath(path);
-        pathSegments.add(PathSegment(path, points));
-      }
-      lastValidPoint = null;
-      currentSegmentIndex = 0;
-    });
-  } */
 
   void initializePathSegments() {
     setState(() {
@@ -194,113 +180,6 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
       currentSegmentIndex = 0;
     });
   }
-
-  /* bool isPointNearPath(Offset point, List<Offset> pathPoints, {bool checkDirection = true}) {
-    if (pathPoints.isEmpty) return false;
-
-    int closestIndex = 0;
-    double minDistance = double.infinity;
-
-    // If we have a last valid point, start searching from there
-    int searchStartIndex = 0;
-    if (lastValidPoint != null && checkDirection) {
-      int lastIndex = pathPoints.indexWhere((p) => (p - lastValidPoint!).distance < threshold);
-      if (lastIndex != -1) {
-        searchStartIndex = lastIndex;
-      }
-    }
-
-    // Only search forward from the last valid point
-    for (int i = searchStartIndex; i < pathPoints.length; i++) {
-      double distance = (point - pathPoints[i]).distance;
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestIndex = i;
-      }
-    }
-
-    // Apply adjusted tolerance
-    double currentThreshold = threshold;
-    if (minDistance > currentThreshold * (1 + offTrackTolerance)) return false;
-
-    // For initial touch, ensure it's near the start of the path
-    if (!isDrawing && checkDirection) {
-      int allowedStartRange = (pathPoints.length * 0.2).round();
-      if (closestIndex > allowedStartRange) {
-        return false;
-      }
-    }
-
-    // Enforce forward progression more strictly
-    if (checkDirection && lastValidPoint != null) {
-      int lastValidIndex = pathPoints.indexWhere((p) => (p - lastValidPoint!).distance < currentThreshold);
-      if (lastValidIndex != -1) {
-        // Only allow forward movement within a reasonable range
-        if (closestIndex < lastValidIndex) {
-          return false;
-        }
-      }
-    }
-
-    lastValidPoint = pathPoints[closestIndex];
-    return true;
-  } */
-
-  /* bool isPointNearPath(Offset point, List<Offset> pathPoints, {bool checkDirection = true}) {
-    if (pathPoints.isEmpty) return false;
-
-    PathSegment currentSegment = pathSegments[currentSegmentIndex];
-    int closestIndex = 0;
-    double minDistance = double.infinity;
-
-    // Calculate search range based on current progress
-    int searchStartIndex = 0;
-    int searchEndIndex = pathPoints.length;
-
-    if (lastValidPoint != null && checkDirection) {
-      // Find the last valid point's index
-      int lastIndex = pathPoints.indexWhere((p) => (p - lastValidPoint!).distance < threshold);
-      if (lastIndex != -1) {
-        searchStartIndex = lastIndex;
-        // Limit forward search to prevent jumping too far ahead
-        searchEndIndex = min(lastIndex + (pathPoints.length ~/ 4), pathPoints.length);
-      }
-    }
-
-    // Search only within the valid range for the current segment
-    for (int i = searchStartIndex; i < searchEndIndex; i++) {
-      double distance = (point - pathPoints[i]).distance;
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestIndex = i;
-      }
-    }
-
-    // Apply adjusted tolerance
-    if (minDistance > threshold * (1 + offTrackTolerance)) return false;
-
-    // For initial touch, ensure it's near the start of the path
-    if (!isDrawing && checkDirection) {
-      int allowedStartRange = (pathPoints.length * 0.2).round();
-      if (closestIndex > allowedStartRange) {
-        return false;
-      }
-    }
-
-    // Check if point is in the correct sequence
-    if (checkDirection && lastValidPoint != null) {
-      int lastValidIndex = pathPoints.indexWhere((p) => (p - lastValidPoint!).distance < threshold);
-      if (lastValidIndex != -1) {
-        // Only allow forward movement within the current segment
-        if (closestIndex < lastValidIndex) {
-          return false;
-        }
-      }
-    }
-
-    lastValidPoint = pathPoints[closestIndex];
-    return true;
-  } */
 
   void goToNextLetter() {
     String nextLetter = String.fromCharCode(widget.letter.codeUnitAt(0) + 1);
@@ -340,125 +219,11 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
     return true;
   }
 
-  /* void checkSegmentProgress(Offset point) {
-    if (currentSegmentIndex >= pathSegments.length) return;
-
-    PathSegment currentSegment = pathSegments[currentSegmentIndex];
-    if (currentSegment.isClearing) return; // Prevent progress while clearing
-
-    if (currentSegment.isCompleted) {
-      // Move to the next segment if the current one is completed
-      if (currentSegmentIndex + 1 < pathSegments.length) {
-        currentSegmentIndex++;
-        lastValidPoint = null;
-      }
-      return;
-    }
-
-    currentSegment.currentTrace.add(point);
-
-    // Ensure the user starts correctly
-    if (!currentSegment.wasStartedCorrectly) {
-      int startRange = (currentSegment.points.length * 0.15).round();
-      List<Offset> startPoints = currentSegment.points.sublist(0, startRange);
-      if (!isPointNearPath(point, startPoints, checkDirection: true)) return;
-
-      currentSegment.wasStartedCorrectly = true;
-    }
-
-    // Update progress only if user is on the path
-    int closestIndex = 0;
-    double minDistance = double.infinity;
-
-    for (int i = 0; i < currentSegment.points.length; i++) {
-      double distance = (point - currentSegment.points[i]).distance;
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestIndex = i;
-      }
-    }
-
-    if (minDistance <= threshold) {
-      setState(() {
-        double newProgress = closestIndex / (currentSegment.points.length - 1);
-        if (newProgress > currentSegment.progress) {
-          currentSegment.progress = newProgress;
-
-          // Check if segment is completed
-          if (currentSegment.progress == 1 &&
-              isTraceContinuous(currentSegment.currentTrace) &&
-              hasMinimumTraceLength(currentSegment)) {
-            completeSegment();
-          }
-        }
-      });
-    } else {
-      // Drain progress when off path
-      startClearAnimation();
-    }
-  } */
-
-  /* void checkSegmentProgress(Offset point) {
-    if (currentSegmentIndex >= pathSegments.length) return;
-
-    PathSegment currentSegment = pathSegments[currentSegmentIndex];
-    if (currentSegment.isClearing) return; // Prevent progress while clearing
-
-    if (currentSegment.isCompleted) {
-      // Move to the next segment if the current one is completed
-      if (currentSegmentIndex + 1 < pathSegments.length) {
-        currentSegmentIndex++;
-        lastValidPoint = null;
-      }
-      return;
-    }
-
-    // Don't add points or update progress if drawing is disabled
-    if (!isDrawing) return;
-
-    currentSegment.currentTrace.add(point);
-
-    // Ensure the user starts correctly
-    if (!currentSegment.wasStartedCorrectly) {
-      int startRange = (currentSegment.points.length * 0.15).round();
-      List<Offset> startPoints = currentSegment.points.sublist(0, startRange);
-      if (!isPointNearPath(point, startPoints, checkDirection: true)) return;
-
-      currentSegment.wasStartedCorrectly = true;
-    }
-
-    // Update progress only if user is on the path
-    int closestIndex = 0;
-    double minDistance = double.infinity;
-
-    for (int i = 0; i < currentSegment.points.length; i++) {
-      double distance = (point - currentSegment.points[i]).distance;
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestIndex = i;
-      }
-    }
-
-    if (minDistance <= threshold) {
-      setState(() {
-        double newProgress = closestIndex / (currentSegment.points.length - 1);
-        if (newProgress > currentSegment.progress) {
-          currentSegment.progress = newProgress;
-
-          // Check if segment is completed
-          if (currentSegment.progress == 1 &&
-              isTraceContinuous(currentSegment.currentTrace) &&
-              hasMinimumTraceLength(currentSegment)) {
-            completeSegment();
-          }
-        }
-      });
-    }
-  } */
   bool isPointNearPath(Offset point, List<Offset> pathPoints, {bool checkDirection = true}) {
     if (pathPoints.isEmpty) return false;
 
     PathSegment currentSegment = pathSegments[currentSegmentIndex];
+    Offset transformedPoint = _transformPoint(point);
 
     // For initial touch, only check near the start
     if (!isDrawing || !checkDirection) {
@@ -467,7 +232,7 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
       int startIndex = -1;
 
       for (int i = 0; i < startRange; i++) {
-        double distance = (point - pathPoints[i]).distance;
+        double distance = (transformedPoint - pathPoints[i]).distance;
         if (distance < minStartDistance) {
           minStartDistance = distance;
           startIndex = i;
@@ -491,7 +256,7 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
 
     // Only search forward from current position
     for (int i = searchStart; i < searchEnd; i++) {
-      double distance = (point - pathPoints[i]).distance;
+      double distance = (transformedPoint - pathPoints[i]).distance;
       if (distance < minDistance) {
         minDistance = distance;
         closestIndex = i;
@@ -564,7 +329,7 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
   }
 
   List<String> getLetterPaths(String letter) {
-    final Map<String, List<String>> letterPaths = {
+    /* final Map<String, List<String>> letterPaths = {
       'A': [
         'M200,80 L80,360', // Left diagonal
         'M200,80 L320,360', // Right diagonal
@@ -686,25 +451,153 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
       ],
       '4': ['M240,80 L120,260', 'M120,260 L280,260', 'M240,80 L240,360'],
       '5': [
-        'M280,80 L140,80 L140,220',
-        'M140,220 Q180,200 240,180 A67,67 0 0,1 240,360 Q200,360 180,340 Q140,320 140,320'
+        'M300,80 L140,80 L140,200',
+        'M140,200 Q200,180 240,180 A67,67 0 0,1 240,350 Q200,350 190,350 Q140,340 140,320'
       ],
       '6': [
         'M300,140 Q300,80 260,80 L180,80 Q140,80 140,140 L140,300 Q140,360 180,360 L260,360 Q300,360 300,300 L300,280 Q300,220 260,220 L180,220'
       ],
       '7': ['M140,80 L280,80', 'M280,80 L160,360'],
       '8': [
-        'M200,80 Q120,80 120,140 Q120,220 200,220 Q280,220 280,300 Q280,360 200,360 Q120,360 120,300 Q120,220 200,220 Q280,220 280,140 Q280,80 220,80',
-        /* Q280,220 280,140 Q280,80 200,80 */
+        'M200,80 Q120,80 120,140 Q120,220 200,220 Q280,220 280,300 Q280,360 200,360 Q120,360 120,300 Q120,220 200,220 Q280,220 280,140 Q280,80 200,80',
       ],
-      /* 
-      lh:left half circle
-      rh:right half circle
-      rbh: right bottom half circle
-      lbh: left bottom half circle
-       */
       '9': [
         'M260,220 260,220 L180,220 Q140,220 140,180 L140,140 Q140,80 180,80 L260,80 Q300,80 300,140 L300,300 Q300,360 260,360 L180,360 Q140,360 140,300'
+      ]
+    }; */
+    final Map<String, List<String>> letterPaths = {
+      'A': [
+        'M225,45 L90,405', // Left diagonal
+        'M225,45 L360,405', // Right diagonal
+        'M135,270 L315,270' // Cross bar
+      ],
+      'B': [
+        'M135,45 L135,405', // Vertical line
+        'M135,45 195,45 A75,75 0 0,1 195,225 L135,225', // Top curve
+        'M135,225 225,225 A75,75 0 0,1 225,405 L135,405', // Bottom curve
+      ],
+      'C': ['M360,135 Q360,45 270,45 Q90,45 90,225 Q90,405 270,405 Q360,405 360,315'],
+      'D': [
+        'M135,45 L135,405', // Vertical line
+        'M135,45 Q330,45 330,225 Q330,405 135,405' // Curved side
+      ],
+      'E': [
+        'M135,45 L135,405', // Vertical line
+        'M135,45 L315,45', // Top line
+        'M135,225 L270,225', // Middle line
+        'M135,405 L315,405' // Bottom line
+      ],
+      'F': [
+        'M135,45 L135,405', // Vertical line
+        'M135,45 L315,45', // Top line
+        'M135,225 L270,225' // Middle line
+      ],
+      'G': [
+        'M360,135 Q360,45 270,45 L225,45 A75,75 0 0,0 270,405 Q360,405 360,225 L225,225' // Middle line
+      ],
+      'H': [
+        'M113,45 L113,405', // Left vertical
+        'M338,45 L338,405', // Right vertical
+        'M113,225 L338,225' // Middle line
+      ],
+      'I': [
+        'M225,45 L225,405', // Vertical line
+        'M135,45 L315,45', // Top line
+        'M135,405 L315,405' // Bottom line
+      ],
+      'J': [
+        'M180,45 L338,45',
+        'M270,45 L270,315 270,315 Q270,405 203,405 Q113,405 113,315' // Bottom curve
+      ],
+      'K': [
+        'M135,45 L135,405', // Vertical line
+        'M338,45 L135,225', // Upper diagonal
+        'M135,225 L338,405' // Lower diagonal
+      ],
+      'L': [
+        'M135,45 L135,405', // Vertical line
+        'M135,405 L315,405' // Bottom line
+      ],
+      'M': [
+        'M113,45 L113,405', // Left vertical
+        'M113,45 L225,225', // Left diagonal
+        'M225,225 L338,45', // Right diagonal
+        'M338,45 L338,405' // Right vertical
+      ],
+      'N': [
+        'M135,45 L135,405', // Left vertical
+        'M135,45 L315,405', // Diagonal
+        'M315,405 L315,45' // Right vertical
+      ],
+      'O': ['M225,45 Q113,45 113,225 Q113,405 225,405 Q338,405 338,225 Q338,45 225,45'],
+      'P': [
+        'M135,45 L135,405', // Vertical line
+        'M135,45 225,45 A75,75 0 0,1 225,225 L135,225', // Top curve
+      ],
+      'Q': [
+        'M225,45 Q113,45 113,225 Q113,405 225,405 Q338,405 338,225 Q338,45 225,45',
+        'M270,360 L338,428' // Tail
+      ],
+      'R': [
+        'M135,45 L135,405', // Vertical line
+        'M135,45 225,45 A75,75 0 0,1 225,225 L135,225', // Top curve
+        'M225,225 L315,405' // Diagonal
+      ],
+      'S': [
+        'M315,135 Q315,45 225,45 Q135,45 135,135 Q135,225 225,225 Q315,225 315,315 Q315,405 225,405 Q135,405 135,315'
+      ],
+      'T': [
+        'M225,45 L225,405', // Vertical line
+        'M113,45 L338,45' // Top line
+      ],
+      'U': ['M113,45 L113,315 Q113,405 225,405 Q338,405 338,315 L338,45'],
+      'V': [
+        'M113,45 L225,405', // Left diagonal
+        'M338,45 L225,405' // Right diagonal
+      ],
+      'W': [
+        'M90,45 L135,405', // First diagonal
+        'M135,405 L225,225', // Middle peak
+        'M225,225 L315,405', // Second diagonal
+        'M315,405 L360,45' // Last diagonal
+      ],
+      'X': [
+        'M100,45 L350,405', // Forward diagonal
+        'M350,45 L100 ,405' // Backward diagonal
+      ],
+      'Y': [
+        'M100,45 L225,250', // Left diagonal
+        'M350,45 L225,250', // Right diagonal
+        'M225,250 L225,405' // Bottom vertical
+      ],
+      'Z': [
+        'M135,45 L315,45', // Top line
+        'M315,45 L135,405', // Diagonal
+        'M135,405 L315,405' // Bottom line
+      ],
+      '0': ['M225,45 Q135,45 135,225 Q135,405 225,405 Q315,405 315,225 Q315,45 225,45'],
+      '1': ['M150,105 L225,45', 'M225,45 L225,405', 'M150,405 300,405'],
+      '2': [
+        'M158,135 Q158,45 203,45 L293,45 Q338,45 338,135 L338,180 Q338,225 293,225 L203,225 Q158,225 158,270 L158,405 L338,405'
+      ],
+      '3': [
+        'M158,135 Q158,45 225,45 Q293,45 293,135 Q293,225 225,225',
+        'M225,225 Q293,225 293,315 Q293,405 225,405 Q158,405 158,315'
+      ],
+      '4': ['M270,45 L135,270', 'M135,270 L315,270', 'M270,45 L270,405'],
+      '5': [
+        'M338,45 L158,45 L158,180',
+        'M158,180 Q225,158 270,158 A75,75 0 0,1 270,394 Q225,394 214,394 Q158,383 158,315'
+      ],
+      '6': [
+        'M338,135 Q338,45 293,45 L203,45 Q158,45 158,135 L158,315 Q158,405 203,405 L293,405 Q338,405 338,315 L338,270 Q338,225 293,225 L203,225'
+      ],
+      '7': ['M158,45 L315,45', 'M315,45 L180,405'],
+      '8': [
+        'M225,45 Q135,45 135,135 Q135,225 225,225 Q315,225 315,315 Q315,405 225,405 Q135,405 135,315 Q135,225 225,225 Q315,225 315,135 Q315,45 225,45',
+      ],
+      '9': [
+        'M293,225 293,225 L203,225 Q158,225 158,180 L158,135 Q158,45 203,45 L293,45 Q338,45 338,135 L338,315 Q338,405 293,405 L203,405 Q158,405 158,315'
       ]
     };
     return letterPaths[letter] ?? letterPaths['A']!;
@@ -747,8 +640,62 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
     });
   }
 
+  void onPanStart(DragStartDetails details) {
+    setState(() {
+      // Find first uncompleted segment
+      while (currentSegmentIndex < pathSegments.length && pathSegments[currentSegmentIndex].isCompleted) {
+        currentSegmentIndex++;
+      }
+
+      if (currentSegmentIndex < pathSegments.length) {
+        PathSegment currentSegment = pathSegments[currentSegmentIndex];
+
+        // Only reset if not currently clearing
+        if (!currentSegment.isClearing) {
+          currentSegment.reset();
+        }
+
+        // Check if the touch point is valid for starting
+        isDrawing = isPointNearPath(
+          details.localPosition,
+          currentSegment.points,
+          checkDirection: true,
+        );
+
+        if (isDrawing) {
+          currentSegment.wasStartedCorrectly = true;
+          currentSegment.currentTrace.add(details.localPosition);
+        }
+      }
+    });
+  }
+
+  void onPanUpdate(DragUpdateDetails details) {
+    // Allow updates only if we're drawing and not clearing
+    if (!isDrawing || (currentSegmentIndex < pathSegments.length && pathSegments[currentSegmentIndex].isClearing)) {
+      return;
+    }
+
+    if (currentSegmentIndex < pathSegments.length) {
+      checkSegmentProgress(details.localPosition);
+    }
+  }
+
+  void onPanEnd(DragEndDetails details) {
+    setState(() {
+      if (isDrawing && currentSegmentIndex < pathSegments.length && !pathSegments[currentSegmentIndex].isCompleted) {
+        startClearAnimation();
+      }
+      isDrawing = false;
+      lastValidPoint = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final Size screenSize = MediaQuery.of(context).size;
+    _calculateScaleAndOffset(screenSize);
+
     return Stack(
       children: [
         Visibility(
@@ -766,7 +713,7 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
                   child: Transform.scale(
                     scale: _scaleAnimation.value,
                     child: CustomPaint(
-                      size: const Size(400, 400),
+                      size: Size(450 * _scale, 450 * _scale),
                       painter: LetterPainter(
                         pathSegments: pathSegments,
                         currentSegmentIndex: currentSegmentIndex,
@@ -774,6 +721,8 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
                             ? pathSegments[currentSegmentIndex].clearProgress
                             : 0.0,
                         animationValue: 0,
+                        scale: _scale,
+                        offset: _offset,
                       ),
                     ),
                   ),
@@ -782,114 +731,10 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
             },
           ),
         ),
-        /* GestureDetector(
-          onPanStart: (details) {
-            setState(() {
-              // Find the first uncompleted segment
-              while (currentSegmentIndex < pathSegments.length && pathSegments[currentSegmentIndex].isCompleted) {
-                currentSegmentIndex++;
-              }
-
-              if (currentSegmentIndex < pathSegments.length) {
-                PathSegment currentSegment = pathSegments[currentSegmentIndex];
-                currentSegment.currentTrace.clear();
-                currentSegment.wasStartedCorrectly = false;
-
-                isDrawing = isPointNearPath(
-                  details.localPosition,
-                  currentSegment.points,
-                  checkDirection: true,
-                );
-
-                if (isDrawing) {
-                  currentSegment.wasStartedCorrectly = true;
-                  currentSegment.currentTrace.add(details.localPosition);
-                }
-              }
-            });
-          },
-          onPanUpdate: (details) {
-            if (!isDrawing) return; // Exit early if drawing is disabled
-
-            if (currentSegmentIndex < pathSegments.length) {
-              PathSegment currentSegment = pathSegments[currentSegmentIndex];
-
-              // Check if the current point is near the path
-              if (!isPointNearPath(details.localPosition, currentSegment.points)) {
-                // If off path, start clearing animation and disable drawing
-                setState(() {
-                  isDrawing = false;
-                  startClearAnimation();
-                });
-              } else {
-                // If on path, update progress
-                checkSegmentProgress(details.localPosition);
-              }
-            }
-          },
-          onPanEnd: (details) {
-            setState(() {
-              if (isDrawing) {
-                // Start clearing animation if stroke wasn't completed
-                if (currentSegmentIndex < pathSegments.length && !pathSegments[currentSegmentIndex].isCompleted) {
-                  startClearAnimation();
-                }
-              }
-              isDrawing = false;
-              lastValidPoint = null;
-            });
-          },
-          child: Visibility(
-            visible: !_showNextButton,
-            child: AnimatedLetterPainter(
-                pathSegments: pathSegments,
-                currentSegmentIndex: currentSegmentIndex,
-                clearProgress:
-                    currentSegmentIndex < pathSegments.length ? pathSegments[currentSegmentIndex].clearProgress : 0.0),
-          ),
-        ), */
         GestureDetector(
-          onPanStart: (details) {
-            setState(() {
-              while (currentSegmentIndex < pathSegments.length && pathSegments[currentSegmentIndex].isCompleted) {
-                currentSegmentIndex++;
-              }
-
-              if (currentSegmentIndex < pathSegments.length) {
-                PathSegment currentSegment = pathSegments[currentSegmentIndex];
-                currentSegment.reset(); // Reset segment state
-
-                isDrawing = isPointNearPath(
-                  details.localPosition,
-                  currentSegment.points,
-                  checkDirection: true,
-                );
-
-                if (isDrawing) {
-                  currentSegment.wasStartedCorrectly = true;
-                  currentSegment.currentTrace.add(details.localPosition);
-                }
-              }
-            });
-          },
-          onPanUpdate: (details) {
-            if (!isDrawing) return;
-
-            if (currentSegmentIndex < pathSegments.length) {
-              checkSegmentProgress(details.localPosition);
-            }
-          },
-          onPanEnd: (details) {
-            setState(() {
-              if (isDrawing &&
-                  currentSegmentIndex < pathSegments.length &&
-                  !pathSegments[currentSegmentIndex].isCompleted) {
-                startClearAnimation();
-              }
-              isDrawing = false;
-              lastValidPoint = null;
-            });
-          },
+          onPanStart: onPanStart,
+          onPanUpdate: onPanUpdate,
+          onPanEnd: onPanEnd,
           child: Visibility(
             visible: !_showNextButton,
             child: AnimatedLetterPainter(
@@ -897,6 +742,8 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
               currentSegmentIndex: currentSegmentIndex,
               clearProgress:
                   currentSegmentIndex < pathSegments.length ? pathSegments[currentSegmentIndex].clearProgress : 0.0,
+              scale: _scale,
+              offset: _offset,
             ),
           ),
         ),
@@ -908,6 +755,7 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
             maxBlastForce: 5,
             minBlastForce: 2,
             emissionFrequency: 0.05,
+            blastDirectionality: BlastDirectionality.explosive,
             numberOfParticles: 50,
             gravity: 0.1,
           ),
