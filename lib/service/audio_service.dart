@@ -21,10 +21,14 @@ class AudioService {
     String audioPath,
     double volume,
     ReleaseMode releaseMode,
+    Function(void) onComplete,
   ) async {
     final audioPlayer = _getPlayer(playerId) ?? createPlayer(playerId);
     await audioPlayer.setReleaseMode(releaseMode);
     await audioPlayer.play(AssetSource(audioPath), volume: volume);
+    audioPlayer.onPlayerComplete.listen((event) {
+      onComplete(event);
+    });
   }
 
   static Future<void> stopAudio(String playerId) async {

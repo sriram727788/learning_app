@@ -81,7 +81,7 @@ class _LearningScreenState extends State<LearningScreen> with SingleTickerProvid
   void _playSound(String word) async {
     try {
       await AudioService.playAudio(
-          "learning_screen", "sounds/${word.toLowerCase().replaceAll(" ", "")}.mp3", 0.8, ReleaseMode.release);
+          "learning_screen", "sounds/${word.toLowerCase().replaceAll(" ", "")}.mp3", 0.8, ReleaseMode.release, (v) {});
       _controller.forward().then((_) => _controller.reverse());
     } catch (e) {
       debugPrint('Error playing sound: $e');

@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kids_learning/screen/reading_screen.dart';
@@ -31,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _playSound() async {
     // Start the player as soon as the app is displayed.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // await AudioService.playAudio("main_bg", 'sounds/bg_music.mp3', 0.005, ReleaseMode.loop);
+      await AudioService.playAudio("main_bg", 'sounds/bg_music.mp3', 0.005, ReleaseMode.loop, (onComplete) {});
     });
   }
 

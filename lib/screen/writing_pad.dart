@@ -1,8 +1,10 @@
 import 'dart:math' as math;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:kids_learning/screen/letter_tracing_screen.dart';
+import 'package:kids_learning/service/audio_service.dart';
 
 class WritingPad extends StatefulWidget {
   // Change to StatefulWidget
@@ -39,20 +41,24 @@ class _WritingPadState extends State<WritingPad> with SingleTickerProviderStateM
       parent: _buttonController,
       curve: Curves.easeInOut,
     ));
+    AudioService.createPlayer("celebration");
   }
 
   @override
   void dispose() {
     _confettiController.dispose();
     _buttonController.dispose();
+    AudioService.disposeAudio("celebration");
     super.dispose();
   }
 
-  void onLetterComplete() {
+  void onLetterComplete() async {
     _confettiController.play();
-    _buttonController.forward();
-    setState(() {
-      _showNextButton = true;
+    await AudioService.playAudio("celebration", 'sounds/celebration.mp3', 20, ReleaseMode.release, (onComplete) {
+      _buttonController.forward();
+      setState(() {
+        _showNextButton = true;
+      });
     });
   }
 
@@ -117,10 +123,10 @@ class _WritingPadState extends State<WritingPad> with SingleTickerProviderStateM
                 alignment: Alignment.topCenter,
                 child: ConfettiWidget(
                   confettiController: _confettiController,
-                  blastDirection: math.pi / 2,
-                  minBlastForce: 2,
-                  emissionFrequency: 0.05,
-                  numberOfParticles: 40,
+                  blastDirection: math.pi,
+                  blastDirectionality: BlastDirectionality.explosive,
+                  minBlastForce: 5,
+                  numberOfParticles: 300,
                   gravity: 0.1,
                 ),
               ),

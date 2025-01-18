@@ -1,6 +1,5 @@
 import 'dart:math';
 
-import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:kids_learning/painter/letter_painter.dart';
 import 'package:kids_learning/screen/writing_pad.dart';
@@ -28,7 +27,6 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
   Offset? lastValidPoint;
   List<Offset> currentTrace = [];
   bool isAnimating = false;
-  late ConfettiController _confettiController;
   bool _showNextButton = false;
   double _scale = 20.0;
   Offset _offset = Offset.zero;
@@ -44,8 +42,6 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
   void initState() {
     super.initState();
     initializePathSegments();
-
-    _confettiController = ConfettiController(duration: const Duration(seconds: 2));
 
     // Initialize celebration animation controller
     _celebrationController = AnimationController(
@@ -585,9 +581,9 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
         'M225,225 Q293,225 293,315 Q293,405 225,405 Q158,405 158,315'
       ],
       '4': ['M270,45 L135,270', 'M135,270 L315,270', 'M270,45 L270,405'],
-      '5': [
-        'M338,45 L158,45 L158,180',
-        'M158,180 Q225,158 270,158 A75,75 0 0,1 270,394 Q225,394 214,394 Q158,383 158,315'
+      "5": [
+        "M338,90 L158,90 L158,225",
+        "M158,225 Q225,215 270,215 A80,80 0 0,1 270,405 Q225,405 213,405 Q158,405 158,380"
       ],
       '6': [
         'M338,135 Q338,45 293,45 L203,45 Q158,45 158,135 L158,315 Q158,405 203,405 L293,405 Q338,405 338,315 L338,270 Q338,225 293,225 L203,225'
@@ -598,21 +594,19 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
       ],
       '9': [
         'M293,225 293,225 L203,225 Q158,225 158,180 L158,135 Q158,45 203,45 L293,45 Q338,45 338,135 L338,315 Q338,405 293,405 L203,405 Q158,405 158,315'
-      ]
+      ],
     };
     return letterPaths[letter] ?? letterPaths['A']!;
   }
 
   @override
   void dispose() {
-    _confettiController.dispose();
     _celebrationController.dispose();
     super.dispose();
   }
 
   void startCelebration() {
     _celebrationController.forward();
-    _confettiController.play();
     widget.onLetterCompleted();
   }
 
@@ -715,15 +709,15 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
                     child: CustomPaint(
                       size: Size(450 * _scale, 450 * _scale),
                       painter: LetterPainter(
-                        pathSegments: pathSegments,
-                        currentSegmentIndex: currentSegmentIndex,
-                        clearProgress: currentSegmentIndex < pathSegments.length
-                            ? pathSegments[currentSegmentIndex].clearProgress
-                            : 0.0,
-                        animationValue: 0,
-                        scale: _scale,
-                        offset: _offset,
-                      ),
+                          pathSegments: pathSegments,
+                          currentSegmentIndex: currentSegmentIndex,
+                          clearProgress: currentSegmentIndex < pathSegments.length
+                              ? pathSegments[currentSegmentIndex].clearProgress
+                              : 0.0,
+                          // animationValue: 0,
+                          offset: _offset,
+                          scale: _scale,
+                          arrowAnimationProgress: 0.0),
                     ),
                   ),
                 ),
@@ -745,19 +739,6 @@ class _LetterTracingScreenState extends State<LetterTracingScreen> with TickerPr
               scale: _scale,
               offset: _offset,
             ),
-          ),
-        ),
-        Align(
-          alignment: Alignment.topCenter,
-          child: ConfettiWidget(
-            confettiController: _confettiController,
-            blastDirection: pi / 2,
-            maxBlastForce: 5,
-            minBlastForce: 2,
-            emissionFrequency: 0.05,
-            blastDirectionality: BlastDirectionality.explosive,
-            numberOfParticles: 50,
-            gravity: 0.1,
           ),
         ),
       ],
